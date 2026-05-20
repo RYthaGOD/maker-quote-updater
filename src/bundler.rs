@@ -127,17 +127,14 @@ impl JitoBundler {
                 .get_bundle_statuses(vec![bundle_id.clone()])
                 .await
             {
-                if let Some(statuses) = response["result"]["value"].as_array() {
-                    if let Some(s) = statuses.first() {
-                        if let Some(status) = s["confirmation_status"].as_str() {
-                            match status {
-                                "confirmed" | "finalized" | "processed" => {
-                                    info!("🎉 Bundle {} CONFIRMED!", bundle_id);
-                                    return;
-                                }
-                                _ => {}
-                            }
-                        }
+                if let Some(status) = response["result"]["value"]
+                    .as_array()
+                    .and_then(|arr| arr.first())
+                    .and_then(|s| s["confirmation_status"].as_str())
+                {
+                    if status == "confirmed" || status == "finalized" || status == "processed" {
+                        info!("🎉 Bundle {} CONFIRMED!", bundle_id);
+                        return;
                     }
                 }
             }

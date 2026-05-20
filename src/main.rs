@@ -296,7 +296,7 @@ async fn submit_handler<P: BamPlugin>(
         payload,
     };
 
-    if let Err(_) = state.tx_queue.try_send(ordered_payload) {
+    if state.tx_queue.try_send(ordered_payload).is_err() {
         return Err((StatusCode::TOO_MANY_REQUESTS, "Queue full".to_string()));
     }
 

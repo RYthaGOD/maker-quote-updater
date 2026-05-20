@@ -1,4 +1,3 @@
-use bs58;
 use ed25519_dalek::Signer;
 use jito_bam_template::{
     maker_plugin::{MakerQuotePlugin, QuoteUpdate},

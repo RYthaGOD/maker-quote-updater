@@ -65,11 +65,7 @@ impl BamPlugin for MakerQuotePlugin {
             .as_millis() as u64;
 
         // Strict 5-second replay window (allows for minor network lag or server/client clock drift)
-        let diff = if current_time_ms >= payload.timestamp_ms {
-            current_time_ms - payload.timestamp_ms
-        } else {
-            payload.timestamp_ms - current_time_ms
-        };
+        let diff = current_time_ms.abs_diff(payload.timestamp_ms);
 
         if diff > 5000 {
             return Err(anyhow!(

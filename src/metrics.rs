@@ -12,6 +12,12 @@ pub struct SystemMetrics {
     pub processing_latency_count: AtomicU64,
 }
 
+impl Default for SystemMetrics {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SystemMetrics {
     pub fn new() -> Self {
         Self {
