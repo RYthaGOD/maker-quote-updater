@@ -52,6 +52,42 @@ This sidecar integrates directly with Jito's Block Engine and conforms to JTX (J
 
 ---
 
+## API Routes & Observability
+
+The sidecar exposes a high-performance HTTP server built on Axum:
+
+*   **`POST /submit`**: Ingestion endpoint for signed quote updates.
+*   **`GET /openapi.json`**: Exposes the complete OpenAPI v3 schema for easy API integration and client generation.
+*   **`GET /metrics`**: Serves live, zero-overhead Prometheus metrics. Metrics are updated atomically (`AtomicU64`) on the hot path with lock-free synchronization. Exposed metrics include:
+    *   `jito_bam_incoming_requests_total`: Total quote update requests received.
+    *   `jito_bam_deduped_updates_total`: Total stale quote updates dropped in memory.
+    *   `jito_bam_bundle_submissions_total`: Cumulative bundle submissions categorized by status (`success` or `failure`).
+    *   `jito_bam_queue_depth`: Current size of the in-memory aggregation channel.
+    *   `jito_bam_processing_latency_avg_ms`: Live average of aggregation and block engine transmission latency.
+
+---
+
+## Rate Limiting & Resilience
+
+To prevent resource exhaustion and protect downstream validator connections from quote spam, the sidecar implements an in-memory, thread-safe Token Bucket rate limiter.
+
+Configure the rate limiter in `.env`:
+*   **`RATE_LIMIT_MAX_BURST`**: Maximum token bucket capacity/burst requests allowed (Default: `100.0`).
+*   **`RATE_LIMIT_REFILL_RATE`**: Rate at which tokens are refilled per second (Default: `50.0`).
+
+---
+
+## Graceful Shutdown
+
+The sidecar is designed for high-availability cloud deployments. It intercepts host signals (`SIGINT` and `SIGTERM`). 
+
+Upon signal interception:
+1. The Axum HTTP server stops accepting new connections.
+2. In-flight requests are drained and processed.
+3. The aggregator loop drains remaining queue items, finalized transactions are safely processed, and the application exits cleanly with zero orphaned states.
+
+---
+
 ## Configuration Setup
 
 Create a `.env` file in the root directory:
@@ -69,8 +105,12 @@ ALLOWED_MARKETS=SOL/USDC,BTC/USDC
 # Aggregation interval in milliseconds
 BAM_TICK_RATE_MS=50
 
-# Axum API server port
+# Server Port
 PORT=3030
+
+# Rate Limiting Configurations
+RATE_LIMIT_MAX_BURST=100.0
+RATE_LIMIT_REFILL_RATE=50.0
 
 # Solana RPC and Jito Block Engine URLs
 RPC_URL=https://api.mainnet-beta.solana.com
