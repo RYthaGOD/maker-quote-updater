@@ -1,8 +1,8 @@
-use light_client::rpc::{LightClient, LightClientConfig, Rpc};
-use light_client::indexer::Indexer;
-use solana_sdk::pubkey::Pubkey;
-use tracing::{info, error};
 use anyhow::Result;
+use light_client::indexer::Indexer;
+use light_client::rpc::{LightClient, LightClientConfig, Rpc};
+use solana_sdk::pubkey::Pubkey;
+use tracing::{error, info};
 
 /// Modular interface for ZK-Compression (Light Protocol) operations.
 /// Handles compressed state resolution and proof verification logic.
@@ -21,7 +21,11 @@ impl ZkModule {
 
     /// Resolve a compressed account and verify its existence.
     pub async fn get_compressed_account(&mut self, address: Pubkey) -> Result<()> {
-        match self.client.get_compressed_account(address.to_bytes(), None).await {
+        match self
+            .client
+            .get_compressed_account(address.to_bytes(), None)
+            .await
+        {
             Ok(_) => Ok(()),
             Err(e) => {
                 error!("❌ Failed to resolve compressed account {}: {}", address, e);

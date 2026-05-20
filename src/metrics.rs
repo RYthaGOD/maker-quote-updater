@@ -37,12 +37,14 @@ impl SystemMetrics {
 
     /// Increments successful bundle submissions
     pub fn inc_bundle_success(&self) {
-        self.bundle_submissions_success.fetch_add(1, Ordering::Relaxed);
+        self.bundle_submissions_success
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Increments failed bundle submissions
     pub fn inc_bundle_failure(&self) {
-        self.bundle_submissions_failure.fetch_add(1, Ordering::Relaxed);
+        self.bundle_submissions_failure
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Sets the queue depth gauge
@@ -52,8 +54,10 @@ impl SystemMetrics {
 
     /// Records latency in milliseconds
     pub fn record_latency(&self, ms: u64) {
-        self.processing_latency_sum_ms.fetch_add(ms, Ordering::Relaxed);
-        self.processing_latency_count.fetch_add(1, Ordering::Relaxed);
+        self.processing_latency_sum_ms
+            .fetch_add(ms, Ordering::Relaxed);
+        self.processing_latency_count
+            .fetch_add(1, Ordering::Relaxed);
     }
 
     /// Serializes active metrics into standard Prometheus exposition format.

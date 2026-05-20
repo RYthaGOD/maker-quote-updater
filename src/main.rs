@@ -5,20 +5,17 @@ use axum::{
     Json, Router,
 };
 use jito_bam_template::{
-    maker_plugin::MakerQuotePlugin,
-    plugin::BamPlugin,
-    bundler::JitoBundler,
+    bundler::JitoBundler, maker_plugin::MakerQuotePlugin, metrics::metrics, plugin::BamPlugin,
     zk::ZkModule,
-    metrics::metrics,
 };
+use solana_sdk::instruction::Instruction;
 use solana_sdk::signature::{Keypair, Signer};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::str::FromStr;
-use tokio::sync::mpsc;
-use tracing::{info, error, warn};
+use std::sync::Arc;
 use std::time::Instant;
-use solana_sdk::instruction::Instruction;
+use tokio::sync::mpsc;
+use tracing::{error, info, warn};
 
 pub struct OrderedPayload<T> {
     pub arrival_time: Instant,
@@ -78,26 +75,40 @@ async fn main() -> anyhow::Result<()> {
 
     // 1. Boot-Time Configuration & Hardened Validation
     info!("🔍 Validating environment variables...");
-    
-    let authority_key_str = std::env::var("BAM_AUTHORITY_KEY")
-        .map_err(|_| anyhow::anyhow!("CRITICAL: BAM_AUTHORITY_KEY environment variable must be set"))?;
-    
+
+    let authority_key_str = std::env::var("BAM_AUTHORITY_KEY").map_err(|_| {
+        anyhow::anyhow!("CRITICAL: BAM_AUTHORITY_KEY environment variable must be set")
+    })?;
+
     let authority = Keypair::from_base58_string(&authority_key_str);
-    info!("✅ BAM_AUTHORITY_KEY loaded. Pubkey: {}", authority.pubkey());
+    info!(
+        "✅ BAM_AUTHORITY_KEY loaded. Pubkey: {}",
+        authority.pubkey()
+    );
 
     let maker_pubkey_str = std::env::var("MAKER_PUBKEY")
         .map_err(|_| anyhow::anyhow!("CRITICAL: MAKER_PUBKEY environment variable must be set"))?;
-    
-    let _maker_pubkey = solana_sdk::pubkey::Pubkey::from_str(&maker_pubkey_str)
-        .map_err(|e| anyhow::anyhow!("CRITICAL: MAKER_PUBKEY is not a valid Solana public key: {}", e))?;
-    info!("✅ MAKER_PUBKEY validated successfully: {}", maker_pubkey_str);
 
-    let _allowed_markets_str = std::env::var("ALLOWED_MARKETS")
-        .map_err(|_| anyhow::anyhow!("CRITICAL: ALLOWED_MARKETS environment variable must be set"))?;
+    let _maker_pubkey = solana_sdk::pubkey::Pubkey::from_str(&maker_pubkey_str).map_err(|e| {
+        anyhow::anyhow!(
+            "CRITICAL: MAKER_PUBKEY is not a valid Solana public key: {}",
+            e
+        )
+    })?;
+    info!(
+        "✅ MAKER_PUBKEY validated successfully: {}",
+        maker_pubkey_str
+    );
+
+    let _allowed_markets_str = std::env::var("ALLOWED_MARKETS").map_err(|_| {
+        anyhow::anyhow!("CRITICAL: ALLOWED_MARKETS environment variable must be set")
+    })?;
     info!("✅ ALLOWED_MARKETS allowance registry active.");
 
-    let rpc_url = std::env::var("RPC_URL").unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
-    let jito_url = std::env::var("JITO_URL").unwrap_or_else(|_| "https://mainnet.block-engine.jito.wtf/api/v1/bundles".to_string());
+    let rpc_url = std::env::var("RPC_URL")
+        .unwrap_or_else(|_| "https://api.mainnet-beta.solana.com".to_string());
+    let jito_url = std::env::var("JITO_URL")
+        .unwrap_or_else(|_| "https://mainnet.block-engine.jito.wtf/api/v1/bundles".to_string());
     let photon_url = std::env::var("PHOTON_URL").ok();
 
     let port: u16 = std::env::var("PORT")
@@ -118,17 +129,22 @@ async fn main() -> anyhow::Result<()> {
     // 2. Initialize Framework Components
     let plugin = Arc::new(MakerQuotePlugin);
     let bundler = Arc::new(JitoBundler::new(&jito_url, &rpc_url, authority));
-    
+
     // Conditional ZK-Module initialization based on environment configuration
     let zk_module = if let Some(p_url) = photon_url {
-        Some(Arc::new(tokio::sync::Mutex::new(ZkModule::new(&rpc_url, &p_url).await?)))
+        Some(Arc::new(tokio::sync::Mutex::new(
+            ZkModule::new(&rpc_url, &p_url).await?,
+        )))
     } else {
         warn!("⚠️  PHOTON_URL not provided. Building transactions without ZK-Compression proofs.");
         None
     };
 
     let (tx_queue, rx_queue) = mpsc::channel(1024);
-    let rate_limiter = Arc::new(tokio::sync::Mutex::new(RateLimiter::new(max_burst, refill_rate)));
+    let rate_limiter = Arc::new(tokio::sync::Mutex::new(RateLimiter::new(
+        max_burst,
+        refill_rate,
+    )));
 
     let state = Arc::new(AppState {
         plugin,
@@ -152,8 +168,11 @@ async fn main() -> anyhow::Result<()> {
         .with_state(state.clone());
 
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    info!("🚀 Jito BAM Plugin Sidecar listening gracefully on {}", addr);
-    
+    info!(
+        "🚀 Jito BAM Plugin Sidecar listening gracefully on {}",
+        addr
+    );
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
@@ -256,13 +275,19 @@ async fn submit_handler<P: BamPlugin>(
     {
         let mut limiter = state.rate_limiter.lock().await;
         if !limiter.check_and_consume() {
-            return Err((StatusCode::TOO_MANY_REQUESTS, "Rate limit exceeded".to_string()));
+            return Err((
+                StatusCode::TOO_MANY_REQUESTS,
+                "Rate limit exceeded".to_string(),
+            ));
         }
     }
-    
+
     // 2. Framework-level Verification
     if let Err(e) = state.plugin.verify(&payload).await {
-        return Err((StatusCode::UNAUTHORIZED, format!("Verification failed: {}", e)));
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            format!("Verification failed: {}", e),
+        ));
     }
 
     // 3. Wrap and Queue for Aggregation
@@ -290,10 +315,11 @@ async fn aggregator_loop<P: BamPlugin>(
         .unwrap_or_else(|_| "50".to_string())
         .parse()
         .unwrap_or(50);
-    
+
     let mut interval = tokio::time::interval(tokio::time::Duration::from_millis(tick_rate_ms));
-    
-    let mut dedup_map: std::collections::HashMap<String, OrderedPayload<P::Payload>> = std::collections::HashMap::new();
+
+    let mut dedup_map: std::collections::HashMap<String, OrderedPayload<P::Payload>> =
+        std::collections::HashMap::new();
     let mut regular_batch: Vec<OrderedPayload<P::Payload>> = Vec::new();
 
     loop {
@@ -334,7 +360,7 @@ async fn process_batch<P: BamPlugin>(
 ) {
     let start_time = Instant::now();
     info!("📦 Processing batch of {} items", batch.len());
-    
+
     // Ensure strict FCFS ordering by sorting based on arrival time
     batch.sort_by_key(|p| p.arrival_time);
 
@@ -351,14 +377,22 @@ async fn process_batch<P: BamPlugin>(
             // _zk_locked.get_compressed_account(...).await;
         }
 
-        match state.plugin.build_instructions(&payload, &authority_pubkey).await {
+        match state
+            .plugin
+            .build_instructions(&payload, &authority_pubkey)
+            .await
+        {
             Ok(ixs) => instruction_chunks.push(ixs),
             Err(e) => error!("❌ Failed to build instructions for payload: {}", e),
         }
     }
 
     if !instruction_chunks.is_empty() {
-        match state.bundler.send_bundle_with_tip(instruction_chunks, state.plugin.get_tip_amount()).await {
+        match state
+            .bundler
+            .send_bundle_with_tip(instruction_chunks, state.plugin.get_tip_amount())
+            .await
+        {
             Ok(id) => {
                 metrics().inc_bundle_success();
                 let bundler = state.bundler.clone();

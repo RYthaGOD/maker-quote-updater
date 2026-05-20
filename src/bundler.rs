@@ -1,4 +1,5 @@
 #![allow(deprecated)]
+use anyhow::{anyhow, Result};
 use jito_sdk_rust::JitoJsonRpcSDK;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
@@ -8,9 +9,8 @@ use solana_sdk::{
     system_instruction,
     transaction::Transaction,
 };
-use tracing::{info, warn};
-use anyhow::{Result, anyhow};
 use std::sync::Arc;
+use tracing::{info, warn};
 
 /// High-performance interface for Jito Bundle management.
 /// Responsible for transaction construction, tip account resolution, and Block Engine integration.
@@ -36,7 +36,7 @@ impl JitoBundler {
         tip_lamports: u64,
     ) -> Result<String> {
         let blockhash = self.rpc_client.get_latest_blockhash()?;
-        
+
         // 1. Fetch Jito Tip Account (with static fallback to avoid single RPC point of failure)
         let tip_account_str = match self.jito_sdk.get_random_tip_account().await {
             Ok(account) => account,
@@ -54,12 +54,14 @@ impl JitoBundler {
                 let idx = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_millis() as usize % static_tips.len();
+                    .as_millis() as usize
+                    % static_tips.len();
                 static_tips[idx].to_string()
             }
         };
-        
-        let tip_pubkey: Pubkey = tip_account_str.parse()
+
+        let tip_pubkey: Pubkey = tip_account_str
+            .parse()
             .map_err(|_| anyhow!("Invalid tip pubkey: {}", tip_account_str))?;
 
         // 2. Prepare Transactions
@@ -101,10 +103,16 @@ impl JitoBundler {
 
         let params = serde_json::json!(bundle);
 
-        let response = self.jito_sdk.send_bundle(Some(params), None).await
+        let response = self
+            .jito_sdk
+            .send_bundle(Some(params), None)
+            .await
             .map_err(|e| anyhow!("Bundle rejected: {}", e))?;
-            
-        let bundle_id = response["result"].as_str().unwrap_or("unknown_id").to_string();
+
+        let bundle_id = response["result"]
+            .as_str()
+            .unwrap_or("unknown_id")
+            .to_string();
 
         info!("🚀 Bundle {} submitted to Jito.", bundle_id);
         Ok(bundle_id)
@@ -114,7 +122,11 @@ impl JitoBundler {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
         for _ in 0..15 {
             interval.tick().await;
-            if let Ok(response) = self.jito_sdk.get_bundle_statuses(vec![bundle_id.clone()]).await {
+            if let Ok(response) = self
+                .jito_sdk
+                .get_bundle_statuses(vec![bundle_id.clone()])
+                .await
+            {
                 if let Some(statuses) = response["result"]["value"].as_array() {
                     if let Some(s) = statuses.first() {
                         if let Some(status) = s["confirmation_status"].as_str() {

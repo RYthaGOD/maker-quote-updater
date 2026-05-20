@@ -1,8 +1,8 @@
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use solana_sdk::instruction::Instruction;
 use solana_sdk::pubkey::Pubkey;
-use anyhow::Result;
 
 /// Core trait for defining Jito BAM Plugin logic.
 /// Implement this trait to customize payload verification and transaction construction.
@@ -25,7 +25,7 @@ pub trait BamPlugin: Send + Sync + 'static {
     /// Build the Solana instructions for a specific payload.
     /// This is where the "Business Logic" lives.
     async fn build_instructions(
-        &self, 
+        &self,
         payload: &Self::Payload,
         authority: &Pubkey,
     ) -> Result<Vec<Instruction>>;

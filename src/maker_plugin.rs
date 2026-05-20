@@ -1,10 +1,10 @@
+use crate::plugin::BamPlugin;
+use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use solana_sdk::instruction::{AccountMeta, Instruction};
 use solana_sdk::pubkey::Pubkey;
 use solana_sdk::signature::Signature;
-use anyhow::{anyhow, Result};
-use crate::plugin::BamPlugin;
 use std::str::FromStr;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -38,18 +38,25 @@ impl BamPlugin for MakerQuotePlugin {
 
     async fn verify(&self, payload: &Self::Payload) -> Result<()> {
         // 1. Verify against allow-list
-        let allowed_markets_str = std::env::var("ALLOWED_MARKETS").unwrap_or_else(|_| "".to_string());
+        let allowed_markets_str =
+            std::env::var("ALLOWED_MARKETS").unwrap_or_else(|_| "".to_string());
         let allowed_markets: Vec<&str> = allowed_markets_str.split(',').collect();
-        
+
         if !allowed_markets.contains(&payload.market_id.as_str()) {
-            return Err(anyhow!("Market {} is not in the ALLOWED_MARKETS list", payload.market_id));
+            return Err(anyhow!(
+                "Market {} is not in the ALLOWED_MARKETS list",
+                payload.market_id
+            ));
         }
 
         // 2. Load Pubkey and Signature
-        let pubkey_base58 = std::env::var("MAKER_PUBKEY").map_err(|_| anyhow!("MAKER_PUBKEY environment variable not set"))?;
-        let pubkey = Pubkey::from_str(&pubkey_base58).map_err(|e| anyhow!("Invalid MAKER_PUBKEY: {}", e))?;
+        let pubkey_base58 = std::env::var("MAKER_PUBKEY")
+            .map_err(|_| anyhow!("MAKER_PUBKEY environment variable not set"))?;
+        let pubkey =
+            Pubkey::from_str(&pubkey_base58).map_err(|e| anyhow!("Invalid MAKER_PUBKEY: {}", e))?;
 
-        let signature = Signature::from_str(&payload.signature).map_err(|e| anyhow!("Invalid bs58 signature: {}", e))?;
+        let signature = Signature::from_str(&payload.signature)
+            .map_err(|e| anyhow!("Invalid bs58 signature: {}", e))?;
 
         // 3. Verify Timestamp (Replay Protection)
         let current_time_ms = std::time::SystemTime::now()
@@ -103,7 +110,7 @@ impl BamPlugin for MakerQuotePlugin {
         // Example: Build an instruction to update the quote on a hypothetical DEX
         // This program ID would be the DEX's actual program ID.
         let program_id = Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap();
-        
+
         let market_pubkey = Pubkey::from_str(&payload.market_id).unwrap_or(*authority);
 
         let ix = Instruction {

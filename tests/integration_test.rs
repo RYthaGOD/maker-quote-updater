@@ -1,9 +1,9 @@
 use bs58;
 use ed25519_dalek::Signer;
 use jito_bam_template::{
-    plugin::BamPlugin,
     maker_plugin::{MakerQuotePlugin, QuoteUpdate},
     metrics::metrics,
+    plugin::BamPlugin,
 };
 
 #[derive(serde::Serialize)]
@@ -67,7 +67,10 @@ async fn test_maker_quote_verification() {
     let mut invalid_payload = valid_payload.clone();
     invalid_payload.signature = "2s1BinvalidSignatureHereXXXXXXXXXXXX".to_string();
     let res_invalid = plugin.verify(&invalid_payload).await;
-    assert!(res_invalid.is_err(), "Invalid signature must fail verification");
+    assert!(
+        res_invalid.is_err(),
+        "Invalid signature must fail verification"
+    );
 
     // 5. Verify unallowed market is rejected
     let mut unallowed_payload = valid_payload.clone();
@@ -85,13 +88,16 @@ async fn test_maker_quote_verification() {
     unallowed_payload.signature = bs58::encode(sig_unallowed.to_bytes()).into_string();
 
     let res_unallowed = plugin.verify(&unallowed_payload).await;
-    assert!(res_unallowed.is_err(), "Unallowed market must be rejected by allow-list");
+    assert!(
+        res_unallowed.is_err(),
+        "Unallowed market must be rejected by allow-list"
+    );
 
     // 6. Verify stale/replay timestamp is rejected (10 seconds ago)
     let mut stale_payload = valid_payload.clone();
     let stale_timestamp_ms = timestamp_ms - 10000;
     stale_payload.timestamp_ms = stale_timestamp_ms;
-    
+
     let data_stale = QuoteUpdateData {
         market_id,
         bid_price,
@@ -104,7 +110,10 @@ async fn test_maker_quote_verification() {
     stale_payload.signature = bs58::encode(sig_stale.to_bytes()).into_string();
 
     let res_stale = plugin.verify(&stale_payload).await;
-    assert!(res_stale.is_err(), "Stale/replayed timestamp must be rejected");
+    assert!(
+        res_stale.is_err(),
+        "Stale/replayed timestamp must be rejected"
+    );
 }
 
 #[test]
@@ -120,7 +129,11 @@ fn test_maker_quote_grouping_key() {
     };
 
     let key = plugin.grouping_key(&payload);
-    assert_eq!(key, Some("SOL/USDC".to_string()), "Grouping key must be market_id for deduplication");
+    assert_eq!(
+        key,
+        Some("SOL/USDC".to_string()),
+        "Grouping key must be market_id for deduplication"
+    );
 }
 
 #[test]
@@ -134,10 +147,28 @@ fn test_system_metrics_exposition() {
     m.record_latency(45);
 
     let format = m.to_prometheus_format();
-    assert!(format.contains("jito_bam_incoming_requests_total"), "Incoming requests metric invalid");
-    assert!(format.contains("jito_bam_deduped_updates_total"), "Deduped updates metric invalid");
-    assert!(format.contains("jito_bam_bundle_submissions_total{status=\"success\"}"), "Bundle success metric invalid");
-    assert!(format.contains("jito_bam_bundle_submissions_total{status=\"failure\"}"), "Bundle failure metric invalid");
-    assert!(format.contains("jito_bam_queue_depth 12"), "Queue depth metric invalid");
-    assert!(format.contains("jito_bam_processing_latency_avg_ms"), "Processing latency average metric invalid");
+    assert!(
+        format.contains("jito_bam_incoming_requests_total"),
+        "Incoming requests metric invalid"
+    );
+    assert!(
+        format.contains("jito_bam_deduped_updates_total"),
+        "Deduped updates metric invalid"
+    );
+    assert!(
+        format.contains("jito_bam_bundle_submissions_total{status=\"success\"}"),
+        "Bundle success metric invalid"
+    );
+    assert!(
+        format.contains("jito_bam_bundle_submissions_total{status=\"failure\"}"),
+        "Bundle failure metric invalid"
+    );
+    assert!(
+        format.contains("jito_bam_queue_depth 12"),
+        "Queue depth metric invalid"
+    );
+    assert!(
+        format.contains("jito_bam_processing_latency_avg_ms"),
+        "Processing latency average metric invalid"
+    );
 }

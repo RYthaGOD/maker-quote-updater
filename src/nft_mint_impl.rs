@@ -1,11 +1,11 @@
 use crate::plugin::BamPlugin;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
-use anyhow::Result;
 
 /// A generic payload for an NFT Mint or Limited Sale
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -42,10 +42,10 @@ impl BamPlugin for ExampleNftMintPlugin {
     ) -> Result<Vec<Instruction>> {
         // 2. Build the exact Solana instructions for your specific program
         // This could be Metaplex, a custom game program, or a DEX.
-        
+
         // Example: Dummy NFT Program ID
-        let program_id = Pubkey::new_from_array([1u8; 32]); 
-        
+        let program_id = Pubkey::new_from_array([1u8; 32]);
+
         let ix = Instruction {
             program_id,
             accounts: vec![

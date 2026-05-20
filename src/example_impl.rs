@@ -1,11 +1,11 @@
 use crate::plugin::BamPlugin;
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
     pubkey::Pubkey,
 };
-use anyhow::Result;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct HeartbeatPayload {
@@ -39,7 +39,7 @@ impl BamPlugin for ExampleHeartbeatPlugin {
         // Standardized payload generator for local simulation and integration testing.
         // Generates a mock Ed25519 node address and dummy data metrics.
         let program_id = Pubkey::new_from_array([0u8; 32]); // Dummy Program ID
-        
+
         let ix = Instruction {
             program_id,
             accounts: vec![

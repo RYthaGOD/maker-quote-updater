@@ -1,6 +1,6 @@
+use bs58;
 use ed25519_dalek::Signer;
 use serde::Serialize;
-use bs58;
 
 #[derive(Serialize)]
 struct QuoteUpdateData<'a> {
@@ -26,7 +26,7 @@ fn main() {
     let bytes = [1u8; 32];
     let signing_key = ed25519_dalek::SigningKey::from_bytes(&bytes);
     let pubkey = signing_key.verifying_key();
-    
+
     let pubkey_base58 = bs58::encode(pubkey.as_bytes()).into_string();
     println!("--- MAKER BOT KEY ---");
     println!("Set this in your .env: MAKER_PUBKEY={}\n", pubkey_base58);
